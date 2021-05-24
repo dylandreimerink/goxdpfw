@@ -1,4 +1,4 @@
-module github.com/dylandreimerink/gobpffw
+module github.com/dylandreimerink/goxdpfw
 
 go 1.16
 
