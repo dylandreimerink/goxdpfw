@@ -1,24 +1,23 @@
 package main
 
-import "github.com/dylandreimerink/gobpfld/ebpf"
+import (
+	"fmt"
+
+	"github.com/dylandreimerink/gobpfld/ebpf"
+)
 
 type Action interface {
-	CompileAction() (*UnlinkedObject, error)
+	AssembleAction() ([]string, error)
 }
 
 var _ Action = (*Drop)(nil)
 
 type Drop struct{}
 
-func (b *Drop) CompileAction() (*UnlinkedObject, error) {
-	return &UnlinkedObject{
-		instructions: []ebpf.Instruction{
-			&ebpf.Mov64{
-				Dest:  ebpf.BPF_REG_0,
-				Value: ebpf.XDP_DROP,
-			},
-			&ebpf.Exit{},
-		},
+func (b *Drop) AssembleAction() ([]string, error) {
+	return []string{
+		fmt.Sprintf("	r0 = %d", ebpf.XDP_DROP),
+		"	exit",
 	}, nil
 }
 
@@ -26,15 +25,10 @@ var _ Action = (*Pass)(nil)
 
 type Pass struct{}
 
-func (b *Pass) CompileAction() (*UnlinkedObject, error) {
-	return &UnlinkedObject{
-		instructions: []ebpf.Instruction{
-			&ebpf.Mov64{
-				Dest:  ebpf.BPF_REG_0,
-				Value: ebpf.XDP_PASS,
-			},
-			&ebpf.Exit{},
-		},
+func (b *Pass) AssembleAction() ([]string, error) {
+	return []string{
+		fmt.Sprintf("	r0 = %d", ebpf.XDP_PASS),
+		"	exit",
 	}, nil
 }
 

@@ -55,6 +55,14 @@ func main() {
 		DefaultAction: &Drop{},
 	}
 
+	asm, err := policy.Assemble()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Error assembly: ", err.Error())
+		os.Exit(1)
+	}
+
+	fmt.Print(asm)
+
 	inst, err := policy.Compile()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Error compile: ", err.Error())

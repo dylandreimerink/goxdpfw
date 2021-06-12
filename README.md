@@ -17,6 +17,10 @@
 
 ## TODO
 
+* gRPC protocol, server and client
+* CLI tool
+    * Deamon executable
+    * `bfw` cli command (shorter than gobpffw, so better as cli tool)
 * IPv4 partial field matching (we can already match whole fields 8, 16, and 32 bits. But not yet single bits or nibbels)
 * IPset matching (matching a IP address(v4 or v6) agains a list of ranges/single ips) implemented using a hash map or LPM map.
 * Default L2 protocol exceptions(Allowing ARP and NDP so local area networking keeps working)

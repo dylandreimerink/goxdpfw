@@ -6,8 +6,8 @@ type NotMatch struct {
 	SubMatch Match
 }
 
-func (not *NotMatch) CompileMatch() (*UnlinkedObject, error) {
-	return not.SubMatch.Invert().CompileMatch()
+func (not *NotMatch) AssembleMatch(counter IDCounter, ruleEndLabel, actionLabel string) ([]string, error) {
+	return not.SubMatch.Invert().AssembleMatch(counter, ruleEndLabel, actionLabel)
 }
 
 func (not *NotMatch) Invert() Match {

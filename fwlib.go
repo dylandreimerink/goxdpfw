@@ -4,8 +4,12 @@ package main
 // by firewall rules to perform common functions like layer/protocol decoding
 type FWLibFunc int
 
-func (flf FWLibFunc) Compile() UnlinkedObject {
+func (flf FWLibFunc) Assemble() []string {
 	return fwLibFuncToObj[flf]
+}
+
+func (flf FWLibFunc) String() string {
+	return fwLibFuncToStr[flf]
 }
 
 const (
@@ -18,6 +22,10 @@ const (
 )
 
 // fwLibFuncToObj is an lookup table which translates a FWLibFunc to an UnlinkedObject
-var fwLibFuncToObj = [maxFWLibGetEthHeader]UnlinkedObject{
+var fwLibFuncToObj = [maxFWLibGetEthHeader][]string{
 	FWLibGetIPv4Header: getIPv4Header(),
+}
+
+var fwLibFuncToStr = [maxFWLibGetEthHeader]string{
+	FWLibGetIPv4Header: "get_ipv4_hdr",
 }

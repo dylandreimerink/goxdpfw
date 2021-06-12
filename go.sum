@@ -1,5 +1,17 @@
+github.com/alecthomas/participle/v2 v2.0.0-alpha6 h1:6IeFBBLWi0xcTk4ModH9UKkLBYf5l5OzaYkJOjZW1rg=
+github.com/alecthomas/participle/v2 v2.0.0-alpha6/go.mod h1:Z1zPLDbcGsVsBYsThKXY00i84575bN/nMczzIrU4rWU=
+github.com/alecthomas/repr v0.0.0-20181024024818-d37bc2a10ba1/go.mod h1:xTS7Pm1pD1mvyM075QCDSRqH6qRLXylzS24ZTpRiSzQ=
+github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
+github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/dylandreimerink/gobpfld v0.1.1-0.20210524104518-48de9a888ccf h1:+6LCwxJN3IugGRRL0cY+ZlJOXsh0CDc+cIsPsZ6y39Y=
 github.com/dylandreimerink/gobpfld v0.1.1-0.20210524104518-48de9a888ccf/go.mod h1:aTOxr8ouTLCRqwEFRFXtMbw4IhowvdbyQ7qCxQYBMEY=
+github.com/dylandreimerink/gobpfld v0.1.1-0.20210612164229-5fe28ed2486e h1:RnD2I1tWaHKI1zxG/pSTJlUU4eu4t0JG4g1N28eEkf4=
+github.com/dylandreimerink/gobpfld v0.1.1-0.20210612164229-5fe28ed2486e/go.mod h1:yEfB8swVQb6tjxP1z2wMXdi0l1sz36HpU2mzxPP0XFg=
+github.com/dylandreimerink/gobpfld v0.2.0 h1:Ek7kkMUOe+/5bEXFRAc+IAszPY5OLBsFdEW+DK20QH0=
+github.com/dylandreimerink/gobpfld v0.2.0/go.mod h1:yEfB8swVQb6tjxP1z2wMXdi0l1sz36HpU2mzxPP0XFg=
+github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
+github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
+github.com/stretchr/testify v1.4.0/go.mod h1:j7eGeouHqKxXV5pUuKE4zz7dFj8WfuZ+81PSLYec5m4=
 github.com/vishvananda/netlink v1.1.0 h1:1iyaYNBLmP6L0220aDnYQpo1QEV4t4hJ+xEEhhJH8j0=
 github.com/vishvananda/netlink v1.1.0/go.mod h1:cTgwzPIzzgDAYoQrMm0EdrjRUBkTqKYppBueQtXaqoE=
 github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df h1:OviZH7qLw/7ZovXvuNyL3XQl8UFofeikI1NW1Gypu7k=
@@ -7,3 +19,6 @@ github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df/go.mod h1:JP3t17
 golang.org/x/sys v0.0.0-20190606203320-7fc4e5ec1444/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20210330210617-4fbd30eecc44 h1:Bli41pIlzTzf3KEY06n+xnzK/BESIg2ze4Pgfh/aI8c=
 golang.org/x/sys v0.0.0-20210330210617-4fbd30eecc44/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
+gopkg.in/yaml.v2 v2.2.2/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=
+gopkg.in/yaml.v2 v2.2.4/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=

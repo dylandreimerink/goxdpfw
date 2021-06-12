@@ -10,19 +10,23 @@ type AndMatch struct {
 	SubMatch []Match
 }
 
-func (am *AndMatch) CompileMatch() (*UnlinkedObject, error) {
-	andObj := &UnlinkedObject{}
+func (am *AndMatch) AssembleMatch(counter IDCounter, ruleEndLabel, actionLabel string) ([]string, error) {
+	andAsm := []string{
+		"# And",
+	}
 
 	for i, match := range am.SubMatch {
-		matchObj, err := match.CompileMatch()
+		matchAsm, err := match.AssembleMatch(counter, ruleEndLabel, actionLabel)
 		if err != nil {
 			return nil, fmt.Errorf("sub-match %d: %w", i, err)
 		}
 
-		*andObj = CombineObjects(*andObj, *matchObj)
+		andAsm = append(andAsm, matchAsm...)
 	}
 
-	return andObj, nil
+	andAsm = append(andAsm, "# End and")
+
+	return andAsm, nil
 }
 
 func (am *AndMatch) Invert() Match {

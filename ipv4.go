@@ -1,6 +1,9 @@
 package main
 
 import (
+	"fmt"
+	"strconv"
+
 	"github.com/dylandreimerink/gobpfld/ebpf"
 )
 
@@ -78,240 +81,73 @@ func (ifm *IPv4FieldMatch) Invert() Match {
 	}
 }
 
-func (ifm *IPv4FieldMatch) CompileMatch() (*UnlinkedObject, error) {
-	obj := &UnlinkedObject{}
-	obj.instructions = append(obj.instructions, []ebpf.Instruction{
+func (ifm *IPv4FieldMatch) AssembleMatch(counter IDCounter, nextRuleLabel, actionLabel string) ([]string, error) {
+	asm := []string{
+		"# IPv4 field match",
 		// Copy R6 to R1 in case R1 has been reused (R6 is always *xdp_md)
-		&ebpf.Mov64Register{
-			Dest: ebpf.BPF_REG_1,
-			Src:  ebpf.BPF_REG_6,
-		},
+		"	r1 = r6",
 		// Load the 'cached' header location of the IPv4 header
-		&ebpf.LoadMemory{
-			Dest:   ebpf.BPF_REG_0,
-			Src:    ebpf.BPF_REG_10,
-			Offset: headerLocationVariables[FWLibGetIPv4Header],
-			Size:   ebpf.BPF_DW,
-		},
+		fmt.Sprintf("	r0 = *(u64 *)(r10%+d)", headerLocationVariables[FWLibGetIPv4Header]),
 		// If the cached value is not -2, use the cached value and skip the call
-		&ebpf.JumpNotEqual{
-			Dest:   ebpf.BPF_REG_0,
-			Offset: 2,
-			Value:  -2,
-		},
+		"	if r0 != -2 goto +2",
 		// Call FWLibGetIPv4Header
-		&ebpf.CallBPF{
-			Offset: 0, // Offset is 0 since the actual address will be set by the linker
-		},
-	}...)
-	// Add link for the call instruction
-	obj.links = append(obj.links, ObjectLink{
-		Type:      LTFunction,
-		InstIndex: len(obj.instructions) - 1,
-		Index:     int(FWLibGetIPv4Header),
-	})
-	obj.instructions = append(obj.instructions,
+		"	call " + FWLibGetIPv4Header.String(),
 		// Cache the result from FWLibGetIPv4Header
-		&ebpf.StoreMemoryRegister{
-			Dest:   ebpf.BPF_REG_10,
-			Src:    ebpf.BPF_REG_0,
-			Offset: headerLocationVariables[FWLibGetIPv4Header],
-			Size:   ebpf.BPF_DW,
-		},
+		fmt.Sprintf("	*(u64 *)(r10%+d) = r0", headerLocationVariables[FWLibGetIPv4Header]),
 		// Jump to next rule/after action if return < 0
 		// if return == -1, there is no IPv4 header, no other negative number is expected
-		&ebpf.JumpSignedSmallerThan{
-			Dest:  ebpf.BPF_REG_0,
-			Value: 0,
-			// Offset not specified
-		},
-	)
-	// Add link for the call instruction
-	obj.links = append(obj.links, ObjectLink{
-		Type:      LTNextRule,
-		InstIndex: len(obj.instructions) - 1,
-	})
-	obj.instructions = append(obj.instructions,
+		"	if r0 s< 0 goto " + nextRuleLabel,
 		// r2 = xdp_md.data
-		&ebpf.LoadMemory{
-			Dest:   ebpf.BPF_REG_2,
-			Src:    ebpf.BPF_REG_6,
-			Offset: 0,
-			Size:   ebpf.BPF_W,
-		},
+		"	r2 = *(u32 *)(r6 + 0)",
 		// R0 is just the offset of the IPv4 header, to get a pointer we need to
 		// add the xdp_md.data to the offset.
-		&ebpf.Add64Register{
-			Dest: ebpf.BPF_REG_0,
-			Src:  ebpf.BPF_REG_2,
-		},
+		"	r0 += r2",
 		// Load xdp_md->data_end into R1
-		&ebpf.LoadMemory{
-			Dest:   ebpf.BPF_REG_1,
-			Src:    ebpf.BPF_REG_6,
-			Offset: 4,
-			Size:   ebpf.BPF_W,
-		},
+		"	r1 = *(u32 *)(r6 + 4)",
 		// Copy R0 to R2 so we can use R2 for bounds checking
-		&ebpf.Mov64Register{
-			Dest: ebpf.BPF_REG_2,
-			Src:  ebpf.BPF_REG_0,
-		},
+		"	r2 = r0",
 		//
-		&ebpf.Add64{
-			Dest:  ebpf.BPF_REG_2,
-			Value: int32(ifm.Field.offset) + int32(ifm.Field.size) + 1,
-		},
+		fmt.Sprintf("	r2 += %d", int32(ifm.Field.offset)+int32(ifm.Field.size)+1),
 		// if xdp_md.data + offsetof(iphdr->{field}) + sizeof(iphdr->{field}) > xdp_md.data_end
-		&ebpf.JumpGreaterThanRegister{
-			Dest: ebpf.BPF_REG_2,
-			Src:  ebpf.BPF_REG_1,
-			// Offset not specified
-		},
-	)
-
-	// Add link for to start of next rule to Jump instruction
-	obj.links = append(obj.links, ObjectLink{
-		Type:      LTNextRule,
-		InstIndex: len(obj.instructions) - 1,
-	})
-
-	// Invert the op, since we want to jump to the next rule if the condition
-	// doesn't match.
-	opInst := ifm.Op.Invert().Instruction()
-	if valuer, ok := opInst.(ebpf.Valuer); ok {
-		// TODO truncate value to size of field?
-		valuer.SetValue(int32(ifm.Value))
+		"	if r2 > r1 goto " + nextRuleLabel,
+		// Invert the op, since we want to jump to the next rule if the condition
+		// doesn't match.
 	}
 
-	obj.instructions = append(obj.instructions, []ebpf.Instruction{
+	opInst := ifm.Op.Invert().Assembly(strconv.Itoa(ifm.Value), nextRuleLabel)
+
+	asm = append(asm, []string{
 		// Load the IPv4 field into R1
-		&ebpf.LoadMemory{
-			Dest:   ebpf.BPF_REG_1,
-			Src:    ebpf.BPF_REG_0,
-			Offset: int16(ifm.Field.offset),
-			Size:   bytesToBPFSize[ifm.Field.size],
-		},
-		opInst,
+		fmt.Sprintf("	r1 = *(%s *)(r0 + %d)", bytesToBPFSize[ifm.Field.size], int16(ifm.Field.offset)),
+		"	" + opInst,
+		"# End IPv4 field match",
 	}...)
 
-	// Add link for to start of next rule to Jump instruction
-	obj.links = append(obj.links, ObjectLink{
-		Type:      LTNextRule,
-		InstIndex: len(obj.instructions) - 1,
-	})
-
-	return obj, nil
+	return asm, nil
 }
 
-func getIPv4Header() UnlinkedObject {
-	return UnlinkedObject{
+func getIPv4Header() []string {
+	return []string{
 		// TODO cache offset in stack
-		instructions: []ebpf.Instruction{
-			// Set default return value to -1
-			&ebpf.Mov64{
-				Dest:  ebpf.BPF_REG_0,
-				Value: -1,
-			},
-			// r2 = xdp_md.data_end
-			// r2 = *(uint32 *) (r1 + 4)
-			&ebpf.LoadMemory{
-				Size:   ebpf.BPF_W,
-				Dest:   ebpf.BPF_REG_2,
-				Src:    ebpf.BPF_REG_1,
-				Offset: 0x04,
-			},
-			// r1 = xdp_md.data
-			// R1 = *(uint32 *) (R1 + 0)
-			&ebpf.LoadMemory{
-				Size: ebpf.BPF_W,
-				Dest: ebpf.BPF_REG_1,
-				Src:  ebpf.BPF_REG_1,
-			},
-			// r5 = sizeof(ethhdr)
-			// r5 = 14
-			&ebpf.Mov64{
-				Dest:  ebpf.BPF_REG_5,
-				Value: 14,
-			},
-			// r3 = packet bounds checking
-			// r3 = r1
-			&ebpf.Mov64Register{
-				Dest: ebpf.BPF_REG_3,
-				Src:  ebpf.BPF_REG_1,
-			},
-			// r3 = xdp_md.data + sizeof(ethhdr)
-			// r3 += r5
-			&ebpf.Add64Register{
-				Dest: ebpf.BPF_REG_3,
-				Src:  ebpf.BPF_REG_5,
-			},
-			// if xdp_md.data + sizeof(ethhdr) > xdp_md.data_end
-			// if r3 > r2: goto exit
-			&ebpf.JumpGreaterThanRegister{
-				Dest:   ebpf.BPF_REG_3,
-				Src:    ebpf.BPF_REG_2,
-				Offset: 8, // goto exit
-			},
-			// r4 = ethhdr.h_proto
-			// r4 = *(uint16 *) (r1 + 12)
-			&ebpf.LoadMemory{
-				Dest:   ebpf.BPF_REG_4,
-				Src:    ebpf.BPF_REG_1,
-				Offset: 12,
-				Size:   ebpf.BPF_H,
-			},
-			// TODO add 802.1ad and QinQ double tagging support
-			// if ethhdr.h_proto != 0x8100 (802.1Q Virtual LAN)
-			// if r4 != 0x8100: goto iph
-			&ebpf.JumpNotEqual32{
-				Dest:   ebpf.BPF_REG_4,
-				Value:  int32(ebpf.HtonU16(0x8100)),
-				Offset: 4, // goto iph
-			},
-			// r5 = sizeof(ethhdr) + sizeof(vlan_hdr)
-			// 	r5 += 4
-			&ebpf.Add64{
-				Dest:  ebpf.BPF_REG_5,
-				Value: 4,
-			},
-			// r3 = xdp_md.data + sizeof(ethhdr) + sizeof(vlan_hdr)
-			// 	r3 += 4
-			&ebpf.Add64{
-				Dest:  ebpf.BPF_REG_3,
-				Value: 4,
-			},
-			// if xdp_md.data + sizeof(ethhdr) + sizeof(vlan_hdr) > xdp_md.data_end
-			// 	if r3 > r2: goto exit
-			&ebpf.JumpGreaterThanRegister{
-				Dest:   ebpf.BPF_REG_3,
-				Src:    ebpf.BPF_REG_2,
-				Offset: 3,
-			},
-			// r4 = vlan_hdr.h_vlan_encapsulated_proto
-			// 	r4 = *(uint16 *) (r1 + 16)
-			&ebpf.LoadMemory{
-				Dest:   ebpf.BPF_REG_4,
-				Src:    ebpf.BPF_REG_1,
-				Offset: 16,
-				Size:   ebpf.BPF_H,
-			},
-			// iph:
-			// if r4 != 0x0800 (IPv4)
-			// 	if r4 != 0x0800: goto exit
-			&ebpf.JumpNotEqual{
-				Dest:   ebpf.BPF_REG_4,
-				Offset: 1,
-				Value:  int32(ebpf.HtonU16(0x0800)),
-			},
-			// 	r0 = r5
-			&ebpf.Mov64Register{
-				Dest: ebpf.BPF_REG_0,
-				Src:  ebpf.BPF_REG_5,
-			},
-			// exit:
-			// 	exit
-			&ebpf.Exit{},
-		},
+		FWLibGetIPv4Header.String() + ":",
+		"	r0 = -1                         # Set default return value to -1",
+		"	r2 = *(u32 *) (r1 + 4)          # r2 = xdp_md.data_end",
+		"	r1 = *(u32 *) (r1 + 0)          # r1 = xdp_md.data",
+		"	r5 = 14                         # r5 = sizeof(ethhdr)",
+		"	r3 = r1                         # r3 = packet bounds checking",
+		"	r3 += r5                        # r3 = xdp_md.data + sizeof(ethhdr)",
+		"	if r3 > r2 goto get_ipv4_hdr_exit   # if xdp_md.data + sizeof(ethhdr) > xdp_md.data_end",
+		"	r4 = *(u16 *) (r1 + 12)         # r4 = ethhdr.h_proto",
+		// TODO add 802.1ad and QinQ double tagging support
+		fmt.Sprintf("	if r4 != %d goto get_ipv4_hdr_iph  # if ethhdr.h_proto != 0x8100 (802.1Q Virtual LAN)", ebpf.HtonU16(0x8100)),
+		"	r5 += 4                         # r5 = sizeof(ethhdr) + sizeof(vlan_hdr)",
+		"	r3 += 4                         # r3 = xdp_md.data + sizeof(ethhdr) + sizeof(vlan_hdr)",
+		" 	if r3 > r2 goto get_ipv4_hdr_exit   # if xdp_md.data + sizeof(ethhdr) + sizeof(vlan_hdr) > xdp_md.data_end",
+		"	r4 = *(u16 *) (r1 + 16)         # r4 = vlan_hdr.h_vlan_encapsulated_proto",
+		"get_ipv4_hdr_iph:",
+		fmt.Sprintf("	if r4 != %d goto get_ipv4_hdr_exit   # if r4 != 0x0800 (IPv4)", ebpf.HtonU16(0x0800)),
+		"	r0 = r5",
+		"get_ipv4_hdr_exit:",
+		"	exit",
 	}
 }
