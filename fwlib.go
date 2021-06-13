@@ -18,14 +18,17 @@ const (
 	// And it returns the offset to the start of the IPv4 header relative to xdp_md.data.
 	// If there is no IPv4 header found, -1 is returned.
 	FWLibGetIPv4Header FWLibFunc = iota
+	FWLibGetTCPHeader
 	maxFWLibGetEthHeader
 )
 
 // fwLibFuncToObj is an lookup table which translates a FWLibFunc to an UnlinkedObject
 var fwLibFuncToObj = [maxFWLibGetEthHeader][]string{
 	FWLibGetIPv4Header: getIPv4Header(),
+	FWLibGetTCPHeader:  getTCPHeader(),
 }
 
 var fwLibFuncToStr = [maxFWLibGetEthHeader]string{
 	FWLibGetIPv4Header: "get_ipv4_hdr",
+	FWLibGetTCPHeader:  "get_tcp_hdr",
 }

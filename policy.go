@@ -18,6 +18,7 @@ type Policy struct {
 // which hold the result of layer decoding step.
 var headerLocationVariables = map[FWLibFunc]int16{
 	FWLibGetIPv4Header: -8,
+	FWLibGetTCPHeader:  -16,
 }
 
 func (p *Policy) Compile() ([]ebpf.Instruction, error) {

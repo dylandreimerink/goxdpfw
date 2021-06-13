@@ -13,6 +13,10 @@ type IPv4Field struct {
 	size   int
 }
 
+// TODO convert IPv4Field to an interface and implement each field as a seperate struct. Reason for this is that
+// some fields like Version, IHL, and flags don't align to 8 bits. These fields need to be masked and shifted
+// to get a usable value for comparason.
+
 var (
 	IPv4VersionIHL = IPv4Field{
 		offset: 0,
@@ -114,11 +118,14 @@ func (ifm *IPv4FieldMatch) AssembleMatch(counter IDCounter, nextRuleLabel, actio
 		// doesn't match.
 	}
 
+	// Invert the op. The 'action' code comes after the match, so we want to jump over the
+	// the action to the next rule to get the same result.
 	opInst := ifm.Op.Invert().Assembly(strconv.Itoa(ifm.Value), nextRuleLabel)
 
 	asm = append(asm, []string{
 		// Load the IPv4 field into R1
 		fmt.Sprintf("	r1 = *(%s *)(r0 + %d)", bytesToBPFSize[ifm.Field.size], int16(ifm.Field.offset)),
+		// Compare against the static value
 		"	" + opInst,
 		"# End IPv4 field match",
 	}...)
@@ -126,9 +133,13 @@ func (ifm *IPv4FieldMatch) AssembleMatch(counter IDCounter, nextRuleLabel, actio
 	return asm, nil
 }
 
+// getIPv4Header returns the offset from xdp_md.data to the start of the IPv4 header, or -1 if there is no IPv4 header.
 func getIPv4Header() []string {
+	// Arguments
+	// r1 = xdp_md
 	return []string{
-		// TODO cache offset in stack
+		// TODO move L2 parsing to seperate lib function. Let the main program pass the first frame pointer
+		//  via r2 so lib functions can lookup offsets. Add L2 offset caching.
 		FWLibGetIPv4Header.String() + ":",
 		"	r0 = -1                         # Set default return value to -1",
 		"	r2 = *(u32 *) (r1 + 4)          # r2 = xdp_md.data_end",
