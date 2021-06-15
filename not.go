@@ -6,7 +6,7 @@ type NotMatch struct {
 	SubMatch Match
 }
 
-func (not *NotMatch) AssembleMatch(counter IDCounter, ruleEndLabel, actionLabel string) ([]string, error) {
+func (not *NotMatch) AssembleMatch(counter *IDCounter, ruleEndLabel, actionLabel string) ([]string, error) {
 	return not.SubMatch.Invert().AssembleMatch(counter, ruleEndLabel, actionLabel)
 }
 

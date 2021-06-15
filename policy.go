@@ -55,7 +55,7 @@ func (p *Policy) Assemble() (string, error) {
 	//  at the link level.
 
 	for i, rule := range p.Rules {
-		ruleAsm, err := rule.Assemble(counter)
+		ruleAsm, err := rule.Assemble(&counter)
 		if err != nil {
 			return "", fmt.Errorf("rule '%d': %w", i, err)
 		}
@@ -97,7 +97,7 @@ type Rule struct {
 	Action Action
 }
 
-func (r *Rule) Assemble(counter IDCounter) ([]string, error) {
+func (r *Rule) Assemble(counter *IDCounter) ([]string, error) {
 	ruleID := counter.Next()
 	ruleEndLabel := fmt.Sprintf("rule_end_%d", ruleID)
 	actionLabel := fmt.Sprintf("rule_action_%d", ruleID)
@@ -127,7 +127,7 @@ func (r *Rule) Assemble(counter IDCounter) ([]string, error) {
 
 // A Match is any logical expression that can match produce a boolean match from a packet/frame
 type Match interface {
-	AssembleMatch(counter IDCounter, ruleEndLabel, actionLabel string) ([]string, error)
+	AssembleMatch(counter *IDCounter, ruleEndLabel, actionLabel string) ([]string, error)
 	Invert() Match
 }
 
@@ -181,3 +181,11 @@ func (op LogicOp) Invert() LogicOp {
 
 	return -1
 }
+
+// Code to trace_printk:
+// "\t*(u64 *)(r10-240) = 29989 # \"%u\\0\"",
+// "\tr1 = r10					# make a pointer to the frame stack",
+// "\tr1 += -240				# Add offset",
+// "\tr2 = 3					# len = 3 bytes, including the null char",
+// "\tr3 = 123					# value to print(as u32) in this case 123",
+// "\tcall 6					# call function",

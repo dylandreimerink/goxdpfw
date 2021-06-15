@@ -85,7 +85,7 @@ func (ifm *IPv4FieldMatch) Invert() Match {
 	}
 }
 
-func (ifm *IPv4FieldMatch) AssembleMatch(counter IDCounter, nextRuleLabel, actionLabel string) ([]string, error) {
+func (ifm *IPv4FieldMatch) AssembleMatch(counter *IDCounter, nextRuleLabel, actionLabel string) ([]string, error) {
 	asm := []string{
 		"# IPv4 field match",
 		// Copy R6 to R1 in case R1 has been reused (R6 is always *xdp_md)

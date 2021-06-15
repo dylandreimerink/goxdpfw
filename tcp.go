@@ -19,7 +19,7 @@ type genericTCPField struct {
 	size   int
 }
 
-func (gtc *genericTCPField) AssembleFieldCode(nextRuleLabel string) []string {
+func (gtc *genericTCPField) AssembleTCPFieldCode(nextRuleLabel string) []string {
 	return []string{
 		// Bounds check up to and including the field +1 byte margin
 		fmt.Sprintf("	r2 += %d", int32(gtc.offset)+int32(gtc.size)+1),
@@ -31,33 +31,33 @@ func (gtc *genericTCPField) AssembleFieldCode(nextRuleLabel string) []string {
 }
 
 var (
-	TCPSourcePort = genericTCPField{
+	TCPSourcePort = &genericTCPField{
 		offset: 0,
 		size:   2,
 	}
-	TCPDestinationPort = genericTCPField{
+	TCPDestinationPort = &genericTCPField{
 		offset: TCPSourcePort.offset + TCPSourcePort.size,
 		size:   2,
 	}
-	TCPSequence = genericTCPField{
+	TCPSequence = &genericTCPField{
 		offset: TCPDestinationPort.offset + TCPDestinationPort.size,
 		size:   4,
 	}
-	TCPAcknowlegementNum = genericTCPField{
+	TCPAcknowlegementNum = &genericTCPField{
 		offset: TCPSequence.offset + TCPSequence.size,
 		size:   4,
 	}
 	// TODO Header length, flags
-	TCPWindowSize = genericTCPField{
+	TCPWindowSize = &genericTCPField{
 		// Additional 2 is for the header length and flags which are 16 bits
 		offset: TCPAcknowlegementNum.offset + TCPAcknowlegementNum.size + 2,
 		size:   4,
 	}
-	TCPChecksum = genericTCPField{
+	TCPChecksum = &genericTCPField{
 		offset: TCPWindowSize.offset + TCPWindowSize.size + 2,
 		size:   2,
 	}
-	TCPUrgentPointer = genericTCPField{
+	TCPUrgentPointer = &genericTCPField{
 		offset: TCPChecksum.offset + TCPChecksum.size + 2,
 		size:   2,
 	}
@@ -80,7 +80,7 @@ func (tfm *TCPFieldMatch) Invert() Match {
 	}
 }
 
-func (tfm *TCPFieldMatch) AssembleMatch(counter IDCounter, nextRuleLabel, actionLabel string) ([]string, error) {
+func (tfm *TCPFieldMatch) AssembleMatch(counter *IDCounter, nextRuleLabel, actionLabel string) ([]string, error) {
 	asm := []string{
 		"# TCP field match",
 		// Copy R6 to R1 in case R1 has been reused (R6 is always *xdp_md)
@@ -132,13 +132,14 @@ func getTCPHeader() []string {
 		FWLibGetTCPHeader.String() + ":",
 		// Since we are in a function call, we are not allowed to use r6-9 to save r1-5.
 		// So write them to our local stack.
-		"	*(u64 *)(r10 - 0) = r1          # Save r1 in stack",
+		"	*(u64 *)(r10 - 8) = r1          # Save r1 in stack",
 		// TODO Let the main program pass the first frame pointer
 		//  via r2 so lib functions can lookup offsets. Add L3 offset caching.
 		"	call " + FWLibGetIPv4Header.String(),
 		// TODO try IPv6 if there is no IPv4 header is found
 		"	if r0 s< 0 goto exit            # exit if no IPv4",
-		"	r1 = *(u64 *)(r10 - 0)          # Restore r1(xdp_md) from stack",
+		"	r4 = r0							# Store IPv4 offset",
+		"	r1 = *(u64 *)(r10 - 8)          # Restore r1(xdp_md) from stack",
 		"	r2 = *(u32 *)(r1 + 4)           # r2 = xdp_md.data_end",
 		"	r1 = *(u32 *)(r1 + 0)           # r1 = xdp_md.data",
 		"	r1 += r0						# r1 = *iph",
@@ -154,8 +155,9 @@ func getTCPHeader() []string {
 		),
 		"	if r3 != 6 goto exit            # if iphdr->protocol != TCP",
 		"	r0 = *(u8 *)(r1 + 0)            # r0 = iph->version|iph->ihl",
-		"   r0 &= 0xF0					    # r0 = iph->ihl",
+		"   r0 &= 0x0F					    # r0 = iph->ihl (mask of the last nibble)",
 		"   r0 *= 4							# r0 = iph->ihl * 4 (IPv4 data)",
+		"	r0 += r4						# r0 = offset from xdp_md.data to start of TCP header",
 		"exit:",
 		"	exit",
 	}

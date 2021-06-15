@@ -15,37 +15,55 @@ import (
 func main() {
 	policy := Policy{
 		Rules: []Rule{
+			// {
+			// 	Name: "localhost-01<->02",
+			// 	Match: &OrMatch{
+			// 		SubMatch: []Match{
+			// 			&AndMatch{
+			// 				SubMatch: []Match{
+			// 					&IPv4FieldMatch{
+			// 						Field: IPv4SourceAddress,
+			// 						Op:    OpEquals,
+			// 						Value: 0x0100007F,
+			// 					},
+			// 					&IPv4FieldMatch{
+			// 						Field: IPv4DestinationAddress,
+			// 						Op:    OpEquals,
+			// 						Value: 0x0200007F,
+			// 					},
+			// 				},
+			// 			},
+			// 			&AndMatch{
+			// 				SubMatch: []Match{
+			// 					&IPv4FieldMatch{
+			// 						Field: IPv4SourceAddress,
+			// 						Op:    OpEquals,
+			// 						Value: 0x0200007F,
+			// 					},
+			// 					&IPv4FieldMatch{
+			// 						Field: IPv4DestinationAddress,
+			// 						Op:    OpEquals,
+			// 						Value: 0x0100007F,
+			// 					},
+			// 				},
+			// 			},
+			// 		},
+			// 	},
+			// 	Action: &Pass{},
+			// },
 			{
-				Name: "localhost-01<->02",
+				Name: "test",
 				Match: &OrMatch{
 					SubMatch: []Match{
-						&AndMatch{
-							SubMatch: []Match{
-								&IPv4FieldMatch{
-									Field: IPv4SourceAddress,
-									Op:    OpEquals,
-									Value: 0x0100007F,
-								},
-								&IPv4FieldMatch{
-									Field: IPv4DestinationAddress,
-									Op:    OpEquals,
-									Value: 0x0200007F,
-								},
-							},
+						&TCPFieldMatch{
+							Field: TCPSourcePort,
+							Op:    OpEquals,
+							Value: int(ebpf.HtonU16(80)),
 						},
-						&AndMatch{
-							SubMatch: []Match{
-								&IPv4FieldMatch{
-									Field: IPv4SourceAddress,
-									Op:    OpEquals,
-									Value: 0x0200007F,
-								},
-								&IPv4FieldMatch{
-									Field: IPv4DestinationAddress,
-									Op:    OpEquals,
-									Value: 0x0100007F,
-								},
-							},
+						&TCPFieldMatch{
+							Field: TCPDestinationPort,
+							Op:    OpEquals,
+							Value: int(ebpf.HtonU16(80)),
 						},
 					},
 				},

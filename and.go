@@ -10,7 +10,7 @@ type AndMatch struct {
 	SubMatch []Match
 }
 
-func (am *AndMatch) AssembleMatch(counter IDCounter, ruleEndLabel, actionLabel string) ([]string, error) {
+func (am *AndMatch) AssembleMatch(counter *IDCounter, ruleEndLabel, actionLabel string) ([]string, error) {
 	andAsm := []string{
 		"# And",
 	}

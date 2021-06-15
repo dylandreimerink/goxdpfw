@@ -11,7 +11,7 @@ type OrMatch struct {
 	SubMatch []Match
 }
 
-func (om *OrMatch) AssembleMatch(counter IDCounter, ruleEndLabel, actionLabel string) ([]string, error) {
+func (om *OrMatch) AssembleMatch(counter *IDCounter, ruleEndLabel, actionLabel string) ([]string, error) {
 	orAsm := []string{
 		"# Or",
 	}
