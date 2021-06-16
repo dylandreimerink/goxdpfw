@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"strconv"
+
+	"github.com/dylandreimerink/gobpfld/ebpf"
 )
 
 // TCPField is any struct that can generate assembly which puts the contents of a TCP field under test into r1.
@@ -12,15 +14,22 @@ import (
 // * r2 is a pointer to xpd_md.data plus the offset to the start of the TCP header
 type TCPField interface {
 	AssembleTCPFieldCode(nextRuleLabel string) []string
+	GetSize() int
 }
 
 type genericTCPField struct {
 	offset int
 	size   int
+	mask   int
+	shift  int
+}
+
+func (gtc *genericTCPField) GetSize() int {
+	return gtc.size
 }
 
 func (gtc *genericTCPField) AssembleTCPFieldCode(nextRuleLabel string) []string {
-	return []string{
+	asm := []string{
 		// Bounds check up to and including the field +1 byte margin
 		fmt.Sprintf("	r2 += %d", int32(gtc.offset)+int32(gtc.size)+1),
 		// if xdp_md.data + offsetof(tcphdr->{field}) + sizeof(tcphdr->{field}) > xdp_md.data_end
@@ -28,6 +37,26 @@ func (gtc *genericTCPField) AssembleTCPFieldCode(nextRuleLabel string) []string 
 		// Load field at offset of size into r1
 		fmt.Sprintf("	r1 = *(%s *)(r0 + %d)", bytesToBPFSize[gtc.size], int16(gtc.offset)),
 	}
+
+	if gtc.mask != 0 {
+		asm = append(asm,
+			fmt.Sprintf("	r1 &= %d", gtc.mask),
+		)
+	}
+
+	if gtc.shift < 0 {
+		asm = append(asm,
+			fmt.Sprintf("	r1 <<= %d", -gtc.shift),
+		)
+	}
+
+	if gtc.shift > 0 {
+		asm = append(asm,
+			fmt.Sprintf("	r1 >>= %d", gtc.shift),
+		)
+	}
+
+	return asm
 }
 
 var (
@@ -47,18 +76,76 @@ var (
 		offset: TCPSequence.offset + TCPSequence.size,
 		size:   4,
 	}
-	// TODO Header length, flags
+	TCPDataOffset = &genericTCPField{
+		offset: TCPAcknowlegementNum.offset + TCPAcknowlegementNum.size,
+		size:   1,
+		mask:   0b11110000,
+		shift:  4,
+	}
+	TCPFlagNS = &genericTCPField{
+		offset: TCPAcknowlegementNum.offset + TCPAcknowlegementNum.size,
+		size:   1,
+		mask:   0b00000001,
+	}
+	TCPFlagCWR = &genericTCPField{
+		offset: TCPAcknowlegementNum.offset + TCPAcknowlegementNum.size + 1,
+		size:   1,
+		mask:   0b10000000,
+		shift:  7,
+	}
+	TCPFlagECE = &genericTCPField{
+		offset: TCPAcknowlegementNum.offset + TCPAcknowlegementNum.size + 1,
+		size:   1,
+		mask:   0b01000000,
+		shift:  6,
+	}
+	TCPFlagURG = &genericTCPField{
+		offset: TCPAcknowlegementNum.offset + TCPAcknowlegementNum.size + 1,
+		size:   1,
+		mask:   0b00100000,
+		shift:  5,
+	}
+	TCPFlagACK = &genericTCPField{
+		offset: TCPAcknowlegementNum.offset + TCPAcknowlegementNum.size + 1,
+		size:   1,
+		mask:   0b00010000,
+		shift:  4,
+	}
+	TCPFlagPSH = &genericTCPField{
+		offset: TCPAcknowlegementNum.offset + TCPAcknowlegementNum.size + 1,
+		size:   1,
+		mask:   0b00001000,
+		shift:  3,
+	}
+	TCPFlagRST = &genericTCPField{
+		offset: TCPAcknowlegementNum.offset + TCPAcknowlegementNum.size + 1,
+		size:   1,
+		mask:   0b00000100,
+		shift:  2,
+	}
+	TCPFlagSYN = &genericTCPField{
+		offset: TCPAcknowlegementNum.offset + TCPAcknowlegementNum.size + 1,
+		size:   1,
+		mask:   0b00000010,
+		shift:  1,
+	}
+	TCPFlagFIN = &genericTCPField{
+		offset: TCPAcknowlegementNum.offset + TCPAcknowlegementNum.size + 1,
+		size:   1,
+		mask:   0b00000001,
+		shift:  0,
+	}
 	TCPWindowSize = &genericTCPField{
 		// Additional 2 is for the header length and flags which are 16 bits
 		offset: TCPAcknowlegementNum.offset + TCPAcknowlegementNum.size + 2,
-		size:   4,
+		size:   2,
 	}
 	TCPChecksum = &genericTCPField{
-		offset: TCPWindowSize.offset + TCPWindowSize.size + 2,
+		offset: TCPWindowSize.offset + TCPWindowSize.size,
 		size:   2,
 	}
 	TCPUrgentPointer = &genericTCPField{
-		offset: TCPChecksum.offset + TCPChecksum.size + 2,
+		offset: TCPChecksum.offset + TCPChecksum.size,
 		size:   2,
 	}
 	// TODO options
@@ -110,9 +197,21 @@ func (tfm *TCPFieldMatch) AssembleMatch(counter *IDCounter, nextRuleLabel, actio
 	// Gen field specific code
 	asm = append(asm, tfm.Field.AssembleTCPFieldCode(nextRuleLabel)...)
 
+	// The value is specified in host byte order, so turn it into network byte order
+	// since that is how eBPF needs it.
+	networkValue := tfm.Value
+	switch tfm.Field.GetSize() {
+	case 2:
+		networkValue = int(ebpf.Hton16(int16(networkValue)))
+	case 4:
+		networkValue = int(ebpf.Hton32(int32(networkValue)))
+	case 8:
+		networkValue = int(ebpf.Hton64(int64(networkValue)))
+	}
+
 	// Invert the op. The 'action' code comes after the match, so we want to jump over the
 	// the action to the next rule to get the same result.
-	opInst := tfm.Op.Invert().Assembly(strconv.Itoa(tfm.Value), nextRuleLabel)
+	opInst := tfm.Op.Invert().Assembly(strconv.Itoa(networkValue), nextRuleLabel)
 
 	asm = append(asm, []string{
 		// Compare against the static value

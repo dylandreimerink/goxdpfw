@@ -43,8 +43,6 @@ func Test_getIPv4Header(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	prog.DecodeToReader(os.Stdout)
-
 	type testcase struct {
 		name     string
 		layers   []gopacket.SerializableLayer
@@ -139,10 +137,12 @@ func Test_getIPv4Header(t *testing.T) {
 			Data: buf.Bytes(),
 		})
 		if err != nil {
+			prog.DecodeToReader(os.Stdout)
 			t.Fatalf("%s: %v", testCase.name, err)
 		}
 
 		if result.ReturnValue != testCase.expected {
+			prog.DecodeToReader(os.Stdout)
 			t.Fatalf("%s: expected '%d', got '%d'", testCase.name, testCase.expected, result.ReturnValue)
 		}
 	}

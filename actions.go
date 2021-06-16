@@ -14,7 +14,7 @@ var _ Action = (*Drop)(nil)
 
 type Drop struct{}
 
-func (b *Drop) AssembleAction() ([]string, error) {
+func (a *Drop) AssembleAction() ([]string, error) {
 	return []string{
 		fmt.Sprintf("	r0 = %d", ebpf.XDP_DROP),
 		"	exit",
@@ -25,9 +25,24 @@ var _ Action = (*Pass)(nil)
 
 type Pass struct{}
 
-func (b *Pass) AssembleAction() ([]string, error) {
+func (a *Pass) AssembleAction() ([]string, error) {
 	return []string{
 		fmt.Sprintf("	r0 = %d", ebpf.XDP_PASS),
+		"	exit",
+	}, nil
+}
+
+var _ Action = (*testReturn)(nil)
+
+// testReturn returns an arbirary value, it is used during unit testing to give every rule a seperate
+// medurable action.
+type testReturn struct {
+	value int32
+}
+
+func (a *testReturn) AssembleAction() ([]string, error) {
+	return []string{
+		fmt.Sprintf("	r0 = %d", a.value),
 		"	exit",
 	}, nil
 }
